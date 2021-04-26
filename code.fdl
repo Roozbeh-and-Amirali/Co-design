@@ -1,7 +1,6 @@
 dp divider(	in x : ns(8);
 			in y : ns(8);
 			in start : ns(1);
-			in n : ns(4);
 			out q : ns(10);
 			out r : ns(8);
 			out done : ns(1) ) {
@@ -12,57 +11,111 @@ dp divider(	in x : ns(8);
 	reg shift_temp : ns(16);
 	reg r_reg_temp : ns(8);
 	reg n_reg : ns(4);
+	reg n_reg_const : ns(4);
+	reg start_reg : ns(1);
+
+	always {
+		q = q_reg;
+		r = r_reg;
+	}
 
 	sfg idle {
-		$display("cycle is ", $cycle, " quotient is ", q, "mod is ", r);
+		#! $display("idle       ", n_reg, " ", m_reg, " ", r_reg, " ", q_reg);
+		done = 0;
+		start_reg = start;
 	}
 	
 	sfg init {
+		#! $display("init       ", n_reg, " ", m_reg, " ", r_reg, " ", q_reg);
+		done = 0;
 		q_reg = x;
 		m_reg = y;
 		r_reg = 0;
-		n_reg = n;
+		n_reg =	x < 2 ? 1 :
+				x < 4 ? 2 :
+				x < 8 ? 3 :
+				x < 16 ? 4 :
+				x < 32 ? 5 :
+				x < 64 ? 6 :
+				x < 128 ? 7 : 8;
+		n_reg_const =	x < 2 ? 1 :
+						x < 4 ? 2 :
+						x < 8 ? 3 :
+						x < 16 ? 4 :
+						x < 32 ? 5 :
+						x < 64 ? 6 :
+						x < 128 ? 7 : 8;
+		#! $display("n_reg: ", n_reg);
 	}
-		
+
 	sfg shift_1 {
-		r_reg = (r_reg << 1)[6:0] # q_reg[7];
+		#! $display("shift_1    ", n_reg, " ", m_reg, " ", r_reg, " ", q_reg);
+		done = 0;
+		r_reg = n_reg_const == 8 ? r_reg[6:0] # q_reg[7] : 
+				n_reg_const == 7 ? r_reg[6:0] # q_reg[6] : 
+				n_reg_const == 6 ? r_reg[6:0] # q_reg[5] : 
+				n_reg_const == 5 ? r_reg[6:0] # q_reg[4] : 
+				n_reg_const == 4 ? r_reg[6:0] # q_reg[3] : 
+				n_reg_const == 3 ? r_reg[6:0] # q_reg[2] : 
+				n_reg_const == 2 ? r_reg[6:0] # q_reg[1] : 
+				r_reg[6:0] # q_reg[0];
 	}
 	
 	sfg shift_2 {
-		q_reg = q_reg << 1;
+		#! $display("shift_2    ", n_reg, " ", m_reg, " ", r_reg, " ", q_reg);
+		done = 0;
+		q_reg = n_reg_const == 8 ? (q_reg << 1)[7:0] :
+				n_reg_const == 7 ? (q_reg << 1)[6:0] :
+				n_reg_const == 6 ? (q_reg << 1)[5:0] :
+				n_reg_const == 5 ? (q_reg << 1)[4:0] :
+				n_reg_const == 4 ? (q_reg << 1)[3:0] :
+				n_reg_const == 3 ? (q_reg << 1)[2:0] :
+				n_reg_const == 2 ? (q_reg << 1)[1:0] :
+				(q_reg << 1)[0];
 	}
 	
 	sfg sub_1 {
+		#! $display("sub_1      ", n_reg, " ", m_reg, " ", r_reg, " ", q_reg);
+		done = 0;
 		r_reg_temp = r_reg;
 		r_reg = r_reg - m_reg;
 	}
 	
 	sfg sub_2 {
+		#! $display("sub_2      ", n_reg, " ", m_reg, " ", r_reg, " ", q_reg);
+		done = 0;
 		r_reg_temp = r_reg;
 		r_reg = ~(m_reg - r_reg) + 1;
 	}
 	
 	sfg set_q_lsb_0 {
-		q = (q >> 1) << 1;
+		#! $display("lsb_0      ", n_reg, " ", m_reg, " ", r_reg, " ", q_reg);
+		done = 0;
+		q_reg = (q_reg >> 1) << 1;
 		r_reg = r_reg_temp;
 	}
 	
 	sfg set_q_lsb_1 {
-		q = ((q >> 1) << 1) + 1;
+		#! $display("lsb_1      ", n_reg, " ", m_reg, " ", r_reg, " ", q_reg);
+		done = 0;
+		q_reg = ((q_reg >> 1) << 1) + 1;
 	}
 
 	sfg dec_n {
+		#! $display("dec_n      ", n_reg, " ", m_reg, " ", r_reg, " ", q_reg);
+		done = 0;
 		n_reg = n_reg - 1;
 	}
 	
 	sfg do_nothing {
-		
+		#! $display("nothing    ", n_reg, " ", m_reg, " ", r_reg, " ", q_reg);
+		done = 0;
 	}
 	
 	sfg final {
-		q = q_reg;
-		r = r_reg;
+		#! $display("final      ", n_reg, " ", m_reg, " ", r_reg, " ", q_reg);
 		done = 1;
+		$display("cycle is ", $dec, $cycle, " quotient is ", q, " mod is ", r);
 	}
 
 }
@@ -72,9 +125,9 @@ fsm div_ctl(divider) {
 	initial s0;
 	state s1, s2, s3, s4, s5, s6, s7;
 	
-	@s0	(do_nothing) -> s1;
+	@s0	(idle) -> s1;
 	
-	@s1	if (start == 1) then (init) -> s2;
+	@s1	if (start_reg == 1) then (init) -> s2;
 		else (do_nothing) -> s0;
 	
 	@s2	(shift_1) -> s3;
@@ -96,14 +149,12 @@ fsm div_ctl(divider) {
 
 dp TB(	out x : ns(8);
 		out y : ns(8);
-		out start : ns(1); 
-		out n : ns(4) ) {
+		out start : ns(1) ) {
 
 	sfg run {
 		start = 1;
-		x = 14;
-		y = 4;
-		n = 4;
+		x = 71;
+		y = 6;
 	}
 
 }
@@ -115,10 +166,9 @@ dp sysdiv {
 	sig x, y, r : ns(8);
 	sig q : ns(16);
 	sig start, done : ns(10);
-	sig n : ns(4);
 	
-	use divider(x, y, start, n, q, r, done);
-	use TB(x, y, start, n);
+	use divider(x, y, start, q, r, done);
+	use TB(x, y, start);
 
 }
 
