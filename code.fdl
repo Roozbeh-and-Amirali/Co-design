@@ -137,7 +137,14 @@ fsm div_ctl(divider) {
 	@s4	if (r_reg > m_reg) then (sub_1) -> s5;
 		else (sub_2) -> s5;
 	
-	@s5 if (r_reg[7] == 0) then (set_q_lsb_1) -> s6;
+	@s5	if ( (n_reg_const == 8 & r_reg[7] == 0 ) |
+			(n_reg_const == 7 & r_reg[6] == 0 ) |
+			(n_reg_const == 6 & r_reg[5] == 0 ) |
+			(n_reg_const == 5 & r_reg[4] == 0 ) |
+			(n_reg_const == 4 & r_reg[3] == 0 ) |
+			(n_reg_const == 3 & r_reg[2] == 0 ) |
+			(n_reg_const == 2 & r_reg[1] == 0 ) |
+			(n_reg_const == 1 & r_reg[0] == 0 ) ) then (set_q_lsb_1) -> s6;
 		else (set_q_lsb_0) -> s6;
 	
 	@s6	(dec_n) -> s7;
@@ -153,8 +160,8 @@ dp TB(	out x : ns(8);
 
 	sfg run {
 		start = 1;
-		x = 71;
-		y = 6;
+		x = 14;
+		y = 4;
 	}
 
 }
