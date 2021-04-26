@@ -9,6 +9,7 @@ dp divider(	in x : ns(8);
 	reg q_reg : ns(8);
 	reg m_reg : ns(8);
 	reg r_reg : ns(8);
+	reg shift_temp : ns(16);
 	reg r_reg_temp : ns(8);
 	reg n_reg : ns(4);
 
@@ -22,10 +23,9 @@ dp divider(	in x : ns(8);
 		r_reg = 0;
 		n_reg = n;
 	}
-	
+		
 	sfg shift_1 {
-		r_reg[7:1] = (r_reg << 1)[6:0];
-		r_reg[0] = q_reg[7];
+		r_reg = (r_reg << 1)[6:0] # q_reg[7];
 	}
 	
 	sfg shift_2 {
@@ -43,12 +43,12 @@ dp divider(	in x : ns(8);
 	}
 	
 	sfg set_q_lsb_0 {
-		q[0] = 0;
+		q = (q >> 1) << 1;
 		r_reg = r_reg_temp;
 	}
 	
-	sfg set_q_lsb 1 {
-		q[0] = 1;
+	sfg set_q_lsb_1 {
+		q = ((q >> 1) << 1) + 1;
 	}
 
 	sfg dec_n {
@@ -58,13 +58,19 @@ dp divider(	in x : ns(8);
 	sfg do_nothing {
 		
 	}
+	
+	sfg final {
+		q = q_reg;
+		r = r_reg;
+		done = 1;
+	}
 
 }
 
 fsm div_ctl(divider) {
 
 	initial s0;
-	state s1;
+	state s1, s2, s3, s4, s5, s6, s7;
 	
 	@s0	(do_nothing) -> s1;
 	
@@ -83,25 +89,40 @@ fsm div_ctl(divider) {
 	
 	@s6	(dec_n) -> s7;
 	
-	@s7	if (n_reg == 0) then (idle) -> s0;
-		else (do_nothing) -> shift_1;
+	@s7	if (n_reg == 0) then (final) -> s0;
+		else (do_nothing) -> s2;
 
 }
 
-dp TB( out x, y : ns(8); out start : ns(1) ) {
-	sig x, y, r: ns(8);
-	sig q : ns(10);
-	sig n : ns(4);
-	sig start, done : ns(1);
-	
-	use divider(x, y, start, q, r, done);
+dp TB(	out x : ns(8);
+		out y : ns(8);
+		out start : ns(1); 
+		out n : ns(4) ) {
 
-	always {
+	sfg run {
 		start = 1;
 		x = 14;
 		y = 4;
 		n = 4;
 	}
 
+}
+
+hardwired TB_ctl(TB) {run;}
+
+dp sysdiv {
+
+	sig x, y, r : ns(8);
+	sig q : ns(16);
+	sig start, done : ns(10);
+	sig n : ns(4);
+	
+	use divider(x, y, start, n, q, r, done);
+	use TB(x, y, start, n);
+
+}
+
+system S {
+	sysdiv;
 }
 
