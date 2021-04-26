@@ -1,0 +1,30 @@
+dp divider(	in x : ns(8);
+			in y : ns(8);
+			in start : ns(1);
+			out q : ns(10);
+			out r : ns(8);
+			out done : ns(1) ) {
+}
+
+fsm div_ctl(divider) {
+}
+
+dp TB( out x, y : ns(8); out start : ns(1) ) {
+	sfg s1 {
+	}
+}
+
+hardwired TB_ctl(TB) {s1;}
+
+dp sysdiv {
+	sig x, y, r : ns(8);
+	sig q : ns(10);
+	sig start, done : ns(10);
+
+	use divider(x, y, start, q, r, done);
+	use TB(x, y, start);
+}
+
+system s {
+	sysdiv;
+}
