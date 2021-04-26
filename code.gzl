@@ -1,30 +1,107 @@
 dp divider(	in x : ns(8);
 			in y : ns(8);
 			in start : ns(1);
+			in n : ns(4);
 			out q : ns(10);
 			out r : ns(8);
 			out done : ns(1) ) {
+
+	reg q_reg : ns(8);
+	reg m_reg : ns(8);
+	reg r_reg : ns(8);
+	reg r_reg_temp : ns(8);
+	reg n_reg : ns(4);
+
+	sfg idle {
+		$display("cycle is ", $cycle, " quotient is ", q, "mod is ", r);
+	}
+	
+	sfg init {
+		q_reg = x;
+		m_reg = y;
+		r_reg = 0;
+		n_reg = n;
+	}
+	
+	sfg shift_1 {
+		r_reg[7:1] = (r_reg << 1)[6:0];
+		r_reg[0] = q_reg[7];
+	}
+	
+	sfg shift_2 {
+		q_reg = q_reg << 1;
+	}
+	
+	sfg sub_1 {
+		r_reg_temp = r_reg;
+		r_reg = r_reg - m_reg;
+	}
+	
+	sfg sub_2 {
+		r_reg_temp = r_reg;
+		r_reg = ~(m_reg - r_reg) + 1;
+	}
+	
+	sfg set_q_lsb_0 {
+		q[0] = 0;
+		r_reg = r_reg_temp;
+	}
+	
+	sfg set_q_lsb 1 {
+		q[0] = 1;
+	}
+
+	sfg dec_n {
+		n_reg = n_reg - 1;
+	}
+	
+	sfg do_nothing {
+		
+	}
+
 }
 
 fsm div_ctl(divider) {
+
+	initial s0;
+	state s1;
+	
+	@s0	(do_nothing) -> s1;
+	
+	@s1	if (start == 1) then (init) -> s2;
+		else (do_nothing) -> s0;
+	
+	@s2	(shift_1) -> s3;
+	
+	@s3	(shift_2) -> s4;
+	
+	@s4	if (r_reg > m_reg) then (sub_1) -> s5;
+		else (sub_2) -> s5;
+	
+	@s5 if (r_reg[7] == 0) then (set_q_lsb_1) -> s6;
+		else (set_q_lsb_0) -> s6;
+	
+	@s6	(dec_n) -> s7;
+	
+	@s7	if (n_reg == 0) then (idle) -> s0;
+		else (do_nothing) -> shift_1;
+
 }
 
 dp TB( out x, y : ns(8); out start : ns(1) ) {
-	sfg s1 {
-	}
-}
-
-hardwired TB_ctl(TB) {s1;}
-
-dp sysdiv {
-	sig x, y, r : ns(8);
+	sig x, y, r: ns(8);
 	sig q : ns(10);
-	sig start, done : ns(10);
-
+	sig n : ns(4);
+	sig start, done : ns(1);
+	
 	use divider(x, y, start, q, r, done);
-	use TB(x, y, start);
+
+	always {
+		start = 1;
+		x = 14;
+		y = 4;
+		n = 4;
+	}
+
 }
 
-system s {
-	sysdiv;
-}
