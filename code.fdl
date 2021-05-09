@@ -42,7 +42,7 @@
 #define SHFT_SLA	5			/* Shifter <- shiftleftarithmetical (alu) */
 #define SHFT_SRA	6			/* Shifter <- shiftrightarithmetical (alu) */
 #define SHFT_NIL	7			/* Shifter <- ALU */
-#define SHFT_X		SHFT_NIL	/* Shifter <- Shiftleft (alu) */
+#define SHFT_X		SHFT_NIL	/* don't care */
 
 /* encoding for result destination */
 #define DST_R0	0		/* R0 <- Shifer */
@@ -85,20 +85,27 @@ dp control(	in carry, zero	: ns(1);
 			out ctl_dest	: ns(4) ) {
 
 	lookup cstore : ns(32) = {
-		// 0 Lstart:	IN -> R0
-		MI(O_NIL, SBUS_IN, ALU_PASS, SHFT_NIL, DST_R0, NXT_NXT, 0 ),
-		// 1			IN -> ACC
-		MI(O_NIL, SBUS_IN, ALU_PASS, SHFT_NIL, DST_ACC, NXT_NXT, 0 ),
-		// 2 Lcheck:	(R0 - ACC)	// JUMP_IF_Z Ldone
-		MI(O_NIL, SBUS_R0, ALU_SUBS, SHFT_NIL, DST_NIL, NXT_JZ, 6 ),
-		// 3			(R0 - ACC) << 1	// JUMP_IF_C LSmall
-		MI(O_NIL, SBUS_R0, ALU_SUBS, SHFT_SHL, DST_NIL, NXT_JC, 5 ),
-		// 4			R0 - ACC -> R0	// JUMP Lcheck
-		MI(O_NIL, SBUS_R0, ALU_SUBS, SHFT_NIL, DST_R0, NXT_JMP, 2 ),
-		// 5 Lsmall: ACC - R0 -> ACC	// JUMP Lcheck
-		MI(O_NIL, SBUS_R0, ALU_SUBA, SHFT_NIL, DST_ACC, NXT_JMP, 2 ),
-		// 6 Ldone:	R0 -> OUT		// JUMP Lstart
-		MI(O_WR, SBUS_R0, ALU_X, SHFT_X, DST_X, NXT_JMP, 0 )
+	
+		// 0 get n and store it in r0
+		MI(O_NIL,	SBUS_IN,	ALU_PASS,	SHFT_NIL,	DST_R0,		NXT_NXT,	0),
+		// 1 get m and store it in r1
+		MI(O_NIL,	SBUS_IN,	ALU_PASS,	SHFT_NIL,	DST_R1,		NXT_NXT,	0),
+		// answer is in r2
+		// 2 we store 1 in r4 for checking if a number is even or not
+		MI(O_NIL,	SBUS_X,		ALU_SET,	SHFT_NIL,	DST_R4,		NXT_NXT,	0),
+		// 3 check if m is zero
+		MI(O_NIL,	SBUS_R1,	ALU_PASS,	SHFT_NIL,	DST_R1,		NXT_JZ,		8),
+		// 4 check if m is even
+		MI(O_NIL,	SBUS_R1,	ALU_AND,	SHFT_NIL,	DST_NIL,	NXT_JZ,		7),
+		// 5 ans += n
+		MI(O_NIL,	SBUS_R2,	ALU_ADD,	SHFT_NIL,	DST_R2,		NXT_NXT,	0),
+		// 6 shift n to left
+		MI(O_NIL,	SBUS_R0,	ALU_PASS,	SHFT_SHL,	DST_R0,		NXT_NXT,	0),
+		// 7 m = m / 2
+		MI(O_NIL,	SBUS_R1,	ALU_PASS,	SHFT_SRA,	DST_R1,		NXT_JMP,	3),
+		// 8 done!
+		MI(O_WR,	SBUS_R2,	ALU_X,		SHFT_X,		DST_X,		NXT_JMP,	0)
+
 	};
 	
 	reg csar		: ns(12);
