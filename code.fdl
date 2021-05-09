@@ -1,0 +1,75 @@
+// wordlength in the datapath
+#define WLEN 16
+
+/* encoding for data output */
+#define O_NIL	0	/* OT <- 0 */
+#define O_WR	1	/* OT <- SBUS */
+
+/* encoding for SBUS multiplexer */ 
+#define SBUS_R0	0		/* SBUS <- R0 */
+#define SBUS_R1	1		/* SBUS <- R1 */
+#define SBUS_R2	2		/* SBUS <- R2 */
+#define SBUS_R3	3		/* SBUS <- R3 */
+#define SBUS_R4	4		/* SBUS <- R4 */
+#define SBUS_R5	5		/* SBUS <- R5 */
+#define SBUS_R6	6		/* SBUS <- R6 */
+#define SBUS_R7	7		/* SBUS <- R7 */
+#define SBUS_IN	8		/* SBUS <- IN */
+#define SBUS_X	SBUS_R0	/* don't care */
+
+/* encoding for ALU */
+#define ALU_ACC		0		/* ALU <- ACC */
+#define ALU_PASS	1		/* ALU <- SBUS */
+#define ALU_ADD		2		/* ALU <- ACC + SBUS */
+#define ALU_SUBA	3		/* ALU <- ACC - SBUS */
+#define ALU_SUBS	4		/* ALU <- SBUS - ACC */
+#define ALU_AND		5		/* ALU <- ACC and SBUS */
+#define ALU_OR		6		/* ALU <- ACC or SBUS */
+#define ALU_NOT		7		/* ALU <- not SBUS */
+#define ALU_INCS	8		/* ALU <- ACC + 1 */
+#define ALU_INCA	9		/* ALU <- SBUS - 1 */
+#define ALU_CLR		10		/* ALU <- 0 */
+#define ALU_SET 	11		/* ALU <- 1 */
+#define ALU_X		ALU_ACC	/* don't care */
+
+/* encoding for shifter */
+#define SHFT_SHL	1			/* Shifter <- shiftleft (alu) */
+#define SHFT_SHR	2			/* Shifter <- shiftright (alu) */
+#define SHFT_ROL	3			/* Shifter <- rotateleft (alu) */
+#define SHFT_ROR	4			/* Shifter <- rotateright (alu) */
+#define SHFT_SLA	5			/* Shifter <- shiftleftarithmetical (alu) */
+#define SHFT_SRA	6			/* Shifter <- shiftrightarithmetical (alu) */
+#define SHFT_NIL	7			/* Shifter <- ALU */
+#define SHFT_X		SHFT_NIL	/* Shifter <- Shiftleft (alu) */
+
+/* encoding for result destination */
+#define DST_R0	0		/* R0 <- Shifer */
+#define DST_R1	1		/* R1 <- Shifer */
+#define DST_R2	2		/* R2 <- Shifer */
+#define DST_R3	3		/* R3 <- Shifer */
+#define DST_R4	4		/* R4 <- Shifer */
+#define DST_R5	5		/* R5 <- Shifer */
+#define DST_R6	6		/* R6 <- Shifer */
+#define DST_R7	7		/* R7 <- Shifer */
+#define DST_ACC	8		/* IR <- Shifer */
+#define DST_NIL	15		/* not connected <- shifter*/
+#define DST_X	DST_NIL	/* don't care instruction */
+
+/* encoding for command field */
+#define NXT_NXT	0		/* CSAR <- CSAR + 1 */
+#define NXT_JMP	1		/* CSAR <- Address */
+#define NXT_JC	2		/* CSAR <- (carry==1) ? Address : CSAR + 1 */
+#define NXT_JNC	10		/* CSAR <- (carry=0) ? Address : CSAR + 1 */
+#define NXT_JZ	4		/* CSAR <- (zero==1) ? Address : CSAR + 1 */
+#define NXT_JNZ	12		/* CSAR <- (zero==0) ? Address : CSAR + 1 */
+#define NXT_X	NXT_NXT
+
+/* encoding for the micro-instruction word */
+#define MI(OUT, SBUS, ALU, SHFT, DEST, NXT, ADR) \
+	(OUT	<< 31) | \
+	(SBUS	<< 27) | \
+	(ALU	<< 23) | \
+	(SHFT	<< 20) | \
+	(DEST	<< 16) | \
+	(NXT	<< 12) | \
+	(ADR)
