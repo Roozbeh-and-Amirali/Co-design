@@ -73,3 +73,203 @@
 	(DEST	<< 16) | \
 	(NXT	<< 12) | \
 	(ADR)
+
+
+dp control(	in carry, zero	: ns(1);
+			out ctl_ot		: ns(1);
+			out ctl_sbus	: ns(1);
+			out ctl_alu		: ns(4);
+			out ctl_shft	: ns(3);
+			out ctl_dest	: ns(4) ) {
+
+	lookup cstore : ns(32) = {
+		// 0 Lstart:	IN -> R0
+		MI(O_NIL, SBUS_IN, ALU_PASS, SHFT_NIL, DST_R0, NXT_NXT, 0 ),
+		// 1			IN -> ACC
+		MI(O_NIL, SBUS_IN, ALU_PASS, SHFT_NIL, DST_ACC, NXT_NXT, 0 ),
+		// 2 Lcheck:	(R0 - ACC)	// JUMP_IF_Z Ldone
+		MI(O_NIL, SBUS_R0, ALU_SUBS, SHFT_NIL, DST_NIL, NXT_JZ, 6 ),
+		// 3			(R0 - ACC) << 1	// JUMP_IF_C LSmall
+		MI(O_NIL, SBUS_R0, ALU_SUBS, SHFT_SHL, DST_NIL, NXT_JC, 5 ),
+		// 4			R0 - ACC -> R0	// JUMP Lcheck
+		MI(O_NIL, SBUS_R0, ALU_SUBS, SHFT_NIL, DST_R0, NXT_JMP, 2 ),
+		// 5 Lsmall: ACC - R0 -> ACC	// JUMP Lcheck
+		MI(O_NIL, SBUS_R0, ALU_SUBA, SHFT_NIL, DST_ACC, NXT_JMP, 2 ),
+		// 6 Ldone:	R0 -> OUT		// JUMP Lstart
+		MI(O_WR, SBUS_R0, ALU_X, SHFT_X, DST_X, NXT_JMP, 0 )
+	};
+	
+	reg csar		: ns(12);
+	sig mir			: ns(32);
+	sig ctl_nxt		: ns(4);
+	sig csar_nxt	: ns(12);
+	sig ctl_address	: ns(12);
+	
+	always {
+	
+		mir = cstore(csar);
+		ctl_ot		= mir[31];
+		ctl_sbus	= mir[27:30];
+		ctl_alu		= mir[23:26];
+		ctl_shft	= mir[20:22];
+		ctl_dest	= mir[16:19];
+		ctl_nxt		= mir[12:15];
+		ctl_address	= mir[ 0:11];
+		
+		csar_nxt = csar + 1;
+		csar = (ctl_nxt == NXT_NXT) ? csar_nxt:
+				(ctl_nxt == NXT_JMP) ? ctl_address :
+				(ctl_nxt == NXT_JC) ? ((carry==1) ? ctl_address : csar_nxt ) :
+				(ctl_nxt == NXT_JZ) ? ((zero==1) ? ctl_address : csar_nxt ) :
+				(ctl_nxt == NXT_JNC) ? ((carry==0) ? ctl_address : csar_nxt) :
+				(ctl_nxt == NXT_JNZ) ? ((zero==0) ? ctl_address : csar_nxt) :
+				csar;
+	
+	}
+
+}
+
+
+dp regfile (	in ctl_dest	: ns(4);
+				in ctl_sbus	: ns(4);
+				in data_in	: ns(WLEN);
+				out data_out: ns(WLEN) ) {
+	reg r0 : ns(WLEN);
+	reg r1 : ns(WLEN);
+	reg r2 : ns(WLEN);
+	reg r3 : ns(WLEN);
+	reg r4 : ns(WLEN);
+	reg r5 : ns(WLEN);
+	reg r6 : ns(WLEN);
+	reg r7 : ns(WLEN);
+	always {
+		r0 = (ctl_dest) == DST_R0) ? data_in : r0;
+		r1 = (ctl_dest) == DST_R1) ? data_in : r1;
+		r2 = (ctl_dest) == DST_R2) ? data_in : r2;
+		r3 = (ctl_dest) == DST_R3) ? data_in : r3;
+		r4 = (ctl_dest) == DST_R4) ? data_in : r4;
+		r5 = (ctl_dest) == DST_R5) ? data_in : r5;
+		r6 = (ctl_dest) == DST_R6) ? data_in : r6;
+		r7 = (ctl_dest) == DST_R7) ? data_in : r7;
+		data_out =	(ctl_sbus == SBUS_R0) ? r0 :
+					(ctl_sbus == SBUS_R1) ? r1 :
+					(ctl_sbus == SBUS_R2) ? r2 :
+					(ctl_sbus == SBUS_R3) ? r3 :
+					(ctl_sbus == SBUS_R4) ? r4 :
+					(ctl_sbus == SBUS_R5) ? r5 :
+					(ctl_sbus == SBUS_R6) ? r6 :
+					(ctl_sbus == SBUS_R7) ? r7 :
+					r0;
+	}
+}
+
+dp alu (in  ctl_dest : ns(4);
+        in  ctl_alu  : ns(4);
+        in  sbus     : ns(WLEN);
+        in  shift    : ns(WLEN);
+        out q        : ns(WLEN)) {
+
+    reg acc : ns(WLEN);
+    always {
+        q = (ctl_alu == ALU_ACC)  ? acc :
+            (ctl_alu == ALU_PASS) ? sbus :
+            (ctl_alu == ALU_ADD)  ? acc + sbus :
+            (ctl_alu == ALU_SUBA) ? acc - sbus :
+            (ctl_alu == ALU_SUBS) ? sbus - acc :
+            (ctl_alu == ALU_AND)  ? acc & sbus :
+            (ctl_alu == ALU_OR)   ? acc | sbus :
+            (ctl_alu == ALU_NOT)  ? ~ sbus     :
+            (ctl_alu == ALU_INCS) ? sbus + 1   :
+            (ctl_alu == ALU_INCA) ? acc + 1    :
+            (ctl_alu == ALU_CLR)  ? 0          :
+            (ctl_alu == ALU_SET)  ? 1          :
+            0;
+        acc = (ctl_dest == DST_ACC) ? shift : acc;
+    }
+}
+
+dp shifter(in  ctl     : ns(3);
+            out zero    : ns(1);
+            out cy      : ns(1);
+            in  shft_in : ns(WLEN);
+            out so      : ns(WLEN)) {
+
+    always {
+        so = (ctl == SHFT_NIL) ? shft_in :
+             (ctl == SHFT_SHL) ? (ns(WLEN)) (shft_in << 1) :
+             (ctl == SHFT_SHR) ? (ns(WLEN)) (shft_in >> 1) :
+             (ctl == SHFT_ROL) ? (ns(WLEN)) (shft_in # shft_in[WLEN-1]) :
+             (ctl == SHFT_ROR) ? (ns(WLEN)) (shft_in[0] # (shft_in >> 1)):
+             (ctl == SHFT_SLA) ? (ns(WLEN)) (shft_in << 1) :
+             (ctl == SHFT_SRA) ? (ns(WLEN)) (((tc(WLEN)) shft_in) >> 1) :
+             0;
+        zero = (so == 0);
+        cy  = (ctl == SHFT_NIL) ? 0 :
+              (ctl == SHFT_SHL) ? shft_in[WLEN-1] :
+              (ctl == SHFT_SHR) ? 0 :
+              (ctl == SHFT_ROL) ? shft_in[WLEN-1] :
+              (ctl == SHFT_ROR) ? shft_in[0] :
+              (ctl == SHFT_SLA) ? shft_in[WLEN-1] :
+              (ctl == SHFT_SRA) ? 0 :
+              0;
+    }
+}
+
+dp hmm(in  din       : ns(WLEN);
+       out din_strb  : ns(1);
+       out dout      : ns(WLEN);
+       out dout_strb : ns(1)) {
+
+    sig carry, zero : ns(1);
+    sig ctl_ot      : ns(1);
+    sig ctl_sbus    : ns(4);
+    sig ctl_alu     : ns(4);
+    sig ctl_shft    : ns(3);
+    sig ctl_acc     : ns(1);
+    sig ctl_dest    : ns(4);
+
+    sig rf_out, rf_in : ns(WLEN);
+    sig sbus          : ns(WLEN);
+    sig alu_in        : ns(WLEN);
+    sig alu_out       : ns(WLEN);
+    sig shft_in       : ns(WLEN);
+    sig shft_out      : ns(WLEN);
+
+    use control(carry,    zero,     ctl_ot, ctl_sbus, ctl_alu, ctl_shft, ctl_dest);
+    use regfile(ctl_dest, ctl_sbus, rf_in,  rf_out);
+    use alu    (ctl_dest, ctl_alu,  sbus,   alu_in,  alu_out);
+    use shifter(ctl_shft, zero,     carry,  shft_in, shft_out);
+
+    always {
+        sbus      = (ctl_sbus == SBUS_IN) ? din  : rf_out;
+        din_strb  = (ctl_sbus == SBUS_IN) ? 1    : 0;
+        dout      = sbus;
+        dout_strb = (ctl_ot == O_WR) ? 1 : 0;
+        rf_in     = shft_out;
+        alu_in    = shft_out;
+        shft_in   = alu_out;
+    }
+}
+
+dp hmmtest {
+    sig din       : ns(WLEN);
+    sig din_strb  : ns(1);
+    sig dout      : ns(WLEN);
+    sig dout_strb : ns(1);
+    use hmm(din, din_strb, dout, dout_strb);
+
+    reg dcnt      : ns(5);
+    lookup stim   : ns(WLEN) = {14, 32, 87, 12, 23, 99, 32, 22};
+
+    always {
+        dcnt = (din_strb) ? dcnt + 1 : dcnt;
+        din  = stim(dcnt & 7);
+        $display($cycle, " IO ", din_strb, " ", dout_strb, " ", $dec, din, " ", dout);
+    }
+}
+
+system S {
+    hmmtest;
+}
+
+
