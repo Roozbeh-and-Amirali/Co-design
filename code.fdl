@@ -237,6 +237,17 @@ dp shifter(in  ctl     : ns(3);
     }
 }
 
+dp mux1x2(	in sel	:	ns(4);
+			in in1	:	ns(WLEN);
+			in in2	:	ns(WLEN);
+			out q	:	ns(WLEN) ) {
+
+	always {
+		q = (sel == SBUS_IN) ? in1 : in2;
+	}
+
+}
+
 dp hmm(in  din       : ns(WLEN);
        out din_strb  : ns(1);
        out dout      : ns(WLEN);
@@ -261,9 +272,10 @@ dp hmm(in  din       : ns(WLEN);
     use regfile(ctl_dest, ctl_sbus, rf_in,  rf_out);
     use alu    (ctl_dest, ctl_alu, ctl_sbus,  sbus,   alu_in,  alu_out);
     use shifter(ctl_shft, zero,     carry,  shft_in, shft_out);
+    use mux1x2(ctl_sbus, din, rf_out, sbus);
 
     always {
-        sbus      = (ctl_sbus == SBUS_IN) ? din  : rf_out;
+        // sbus      = (ctl_sbus == SBUS_IN) ? din  : rf_out;
         din_strb  = (ctl_sbus == SBUS_IN) ? 1    : 0;
         dout      = sbus;
         dout_strb = (ctl_ot == O_WR) ? 1 : 0;
