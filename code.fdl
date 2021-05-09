@@ -28,8 +28,10 @@
 #define ALU_NOT		7		/* ALU <- not SBUS */
 #define ALU_INCS	8		/* ALU <- ACC + 1 */
 #define ALU_INCA	9		/* ALU <- SBUS - 1 */
-#define ALU_CLR		10		/* ALU <- 0 */
-#define ALU_SET 	11		/* ALU <- 1 */
+#define ALU_ADDI	10		/* ALU <- ACC + [27:30] */
+#define ALU_SUBI	11		/* ALU <- ACC - [27:30] */
+#define ALU_CLR		12		/* ALU <- 0 */
+#define ALU_SET 	13		/* ALU <- 1 */
 #define ALU_X		ALU_ACC	/* don't care */
 
 /* encoding for shifter */
@@ -143,14 +145,14 @@ dp regfile (	in ctl_dest	: ns(4);
 	reg r6 : ns(WLEN);
 	reg r7 : ns(WLEN);
 	always {
-		r0 = (ctl_dest) == DST_R0) ? data_in : r0;
-		r1 = (ctl_dest) == DST_R1) ? data_in : r1;
-		r2 = (ctl_dest) == DST_R2) ? data_in : r2;
-		r3 = (ctl_dest) == DST_R3) ? data_in : r3;
-		r4 = (ctl_dest) == DST_R4) ? data_in : r4;
-		r5 = (ctl_dest) == DST_R5) ? data_in : r5;
-		r6 = (ctl_dest) == DST_R6) ? data_in : r6;
-		r7 = (ctl_dest) == DST_R7) ? data_in : r7;
+		r0 = (ctl_dest == DST_R0) ? data_in : r0;
+		r1 = (ctl_dest == DST_R1) ? data_in : r1;
+		r2 = (ctl_dest == DST_R2) ? data_in : r2;
+		r3 = (ctl_dest == DST_R3) ? data_in : r3;
+		r4 = (ctl_dest == DST_R4) ? data_in : r4;
+		r5 = (ctl_dest == DST_R5) ? data_in : r5;
+		r6 = (ctl_dest == DST_R6) ? data_in : r6;
+		r7 = (ctl_dest == DST_R7) ? data_in : r7;
 		data_out =	(ctl_sbus == SBUS_R0) ? r0 :
 					(ctl_sbus == SBUS_R1) ? r1 :
 					(ctl_sbus == SBUS_R2) ? r2 :
@@ -163,28 +165,48 @@ dp regfile (	in ctl_dest	: ns(4);
 	}
 }
 
-dp alu (in  ctl_dest : ns(4);
-        in  ctl_alu  : ns(4);
-        in  sbus     : ns(WLEN);
-        in  shift    : ns(WLEN);
-        out q        : ns(WLEN)) {
+dp acc	(in input	:	ns(WLEN);
+		out output	:	ns(WLEN)) {
 
-    reg acc : ns(WLEN);
+	reg temp : ns(WLEN);
+
+	always {
+		output = temp;
+		temp = input;
+	}
+
+}
+
+dp alu (in  ctl_dest	: ns(4);
+        in  ctl_alu		: ns(4);
+        in ctl_sbus		: ns(4);
+        in  sbus		: ns(WLEN);
+        in  shift		: ns(WLEN);
+        out q			: ns(WLEN)) {
+    
+    sig acc_in: ns(WLEN);
+    sig acc_out: ns(WLEN);
+    
+    use acc(acc_in, acc_out);
+
+    // reg acc : ns(WLEN);
     always {
-        q = (ctl_alu == ALU_ACC)  ? acc :
+        q = (ctl_alu == ALU_ACC)  ? acc_out :
             (ctl_alu == ALU_PASS) ? sbus :
-            (ctl_alu == ALU_ADD)  ? acc + sbus :
-            (ctl_alu == ALU_SUBA) ? acc - sbus :
-            (ctl_alu == ALU_SUBS) ? sbus - acc :
-            (ctl_alu == ALU_AND)  ? acc & sbus :
-            (ctl_alu == ALU_OR)   ? acc | sbus :
+            (ctl_alu == ALU_ADD)  ? acc_out + sbus :
+            (ctl_alu == ALU_SUBA) ? acc_out - sbus :
+            (ctl_alu == ALU_SUBS) ? sbus - acc_out :
+            (ctl_alu == ALU_AND)  ? acc_out & sbus :
+            (ctl_alu == ALU_OR)   ? acc_out | sbus :
             (ctl_alu == ALU_NOT)  ? ~ sbus     :
             (ctl_alu == ALU_INCS) ? sbus + 1   :
-            (ctl_alu == ALU_INCA) ? acc + 1    :
+            (ctl_alu == ALU_INCA) ? acc_out + 1    :
+            (ctl_alu == ALU_ADDI) ? acc_out + ctl_sbus :
+            (ctl_alu == ALU_SUBI) ? acc_out - ctl_sbus :
             (ctl_alu == ALU_CLR)  ? 0          :
             (ctl_alu == ALU_SET)  ? 1          :
             0;
-        acc = (ctl_dest == DST_ACC) ? shift : acc;
+		acc_in = (ctl_dest == DST_ACC) ? shift : acc_out;
     }
 }
 
@@ -237,7 +259,7 @@ dp hmm(in  din       : ns(WLEN);
 
     use control(carry,    zero,     ctl_ot, ctl_sbus, ctl_alu, ctl_shft, ctl_dest);
     use regfile(ctl_dest, ctl_sbus, rf_in,  rf_out);
-    use alu    (ctl_dest, ctl_alu,  sbus,   alu_in,  alu_out);
+    use alu    (ctl_dest, ctl_alu, ctl_sbus,  sbus,   alu_in,  alu_out);
     use shifter(ctl_shft, zero,     carry,  shft_in, shft_out);
 
     always {
