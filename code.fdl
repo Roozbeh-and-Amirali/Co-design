@@ -91,19 +91,21 @@ dp control(	in carry, zero	: ns(1);
 		// 1 get m and store it in r1
 		MI(O_NIL,	SBUS_IN,	ALU_PASS,	SHFT_NIL,	DST_R1,		NXT_NXT,	0),
 		// answer is in r2
-		// 2 we store 1 in r4 for checking if a number is even or not
-		MI(O_NIL,	SBUS_X,		ALU_SET,	SHFT_NIL,	DST_R4,		NXT_NXT,	0),
-		// 3 check if m is zero
-		MI(O_NIL,	SBUS_R1,	ALU_PASS,	SHFT_NIL,	DST_R1,		NXT_JZ,		8),
+		// 2 check if m is zero
+		MI(O_NIL,	SBUS_R1,	ALU_PASS,	SHFT_NIL,	DST_X,		NXT_JZ,		9),
+		// 3 we store 1 in ACC for checking if a number is even or not
+		MI(O_NIL,	SBUS_X,		ALU_SET,	SHFT_NIL,	DST_ACC,	NXT_NXT,	0),
 		// 4 check if m is even
-		MI(O_NIL,	SBUS_R1,	ALU_AND,	SHFT_NIL,	DST_NIL,	NXT_JZ,		7),
-		// 5 ans += n
+		MI(O_NIL,	SBUS_R1,	ALU_AND,	SHFT_NIL,	DST_NIL,	NXT_JZ,		8),
+		// 5 Store n in ACC
+		MI(O_NIL,	SBUS_R0,	ALU_PASS,	SHFT_NIL,	DST_ACC,	NXT_NXT,	0),
+		// 6 ans += n
 		MI(O_NIL,	SBUS_R2,	ALU_ADD,	SHFT_NIL,	DST_R2,		NXT_NXT,	0),
-		// 6 shift n to left
+		// 7 shift n to left
 		MI(O_NIL,	SBUS_R0,	ALU_PASS,	SHFT_SHL,	DST_R0,		NXT_NXT,	0),
-		// 7 m = m / 2
+		// 8 m = m / 2
 		MI(O_NIL,	SBUS_R1,	ALU_PASS,	SHFT_SRA,	DST_R1,		NXT_JMP,	3),
-		// 8 done!
+		// 9 done!
 		MI(O_WR,	SBUS_R2,	ALU_X,		SHFT_X,		DST_X,		NXT_JMP,	0)
 
 	};
@@ -284,6 +286,7 @@ dp hmm(in  din       : ns(WLEN);
     always {
         // sbus      = (ctl_sbus == SBUS_IN) ? din  : rf_out;
         din_strb  = (ctl_sbus == SBUS_IN) ? 1    : 0;
+        // $display($cycle, " ", din_strb, " ", ctl_sbus, " ", din);
         dout      = sbus;
         dout_strb = (ctl_ot == O_WR) ? 1 : 0;
         rf_in     = shft_out;
@@ -300,7 +303,8 @@ dp hmmtest {
     use hmm(din, din_strb, dout, dout_strb);
 
     reg dcnt      : ns(5);
-    lookup stim   : ns(WLEN) = {14, 32, 87, 12, 23, 99, 32, 22};
+    // lookup stim   : ns(WLEN) = {14, 32, 87, 12, 23, 99, 32, 22};
+    lookup stim : ns(WLEN) = {5, 10};
 
     always {
         dcnt = (din_strb) ? dcnt + 1 : dcnt;
