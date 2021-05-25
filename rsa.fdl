@@ -1,0 +1,61 @@
+ipblock my_arm {
+	iptype "armsystem";
+	ipparm "exec=rsadrive";
+}
+
+ipblock m_req(out data : ns(32)) {
+	iptype "armsystemsource";
+	ipparm "core=my_arm";
+	ipparm "address=0x80000000";
+}
+
+ipblock m_ack(in data : ns(32)) {
+	iptype "armsystemsink";
+	ipparm "core=my_arm";
+	ipparm "address=0x80000004";
+}
+
+ipblock m_data_out(out data : ns(32)) {
+	iptype "armsystemsource";
+	ipparm "core=my_arm";
+	ipparm "address=0x80000008";
+}
+
+ipblock m_data_in(in data : ns(32)) {
+	iptype "armsystemsink";
+	ipparm "core=my_arm";
+	ipparm "address=0x8000000C";
+}
+
+
+dp rsa(	in p_in, q_in	: ns(32);
+		in m_in			: ns(32);
+		in go			: ns( 1);
+		out ready		: ns( 1);
+		out c_out		: ns(32);
+		out m_out		: ns(32)) {
+	
+	reg n, e, z, d, c, m: ns(32); // c must be initialized 1. d must be initialized 2
+	sig done			: ns( 1);
+	reg phase			: ns( 1); // 0 for encyption, 1 for decryption
+	
+	always {
+		// n = p_in * q_in;
+		// z = (p_in - 1) * (q_in - 1);
+		// e = z - 1;	// e must be co-prime to z and smaller than z :)
+		d = ( phase == 0 )
+			? ( ( ( d * e ) % z == 1 ) ? d : d + 1 )
+			: ( d - 1 );			
+		c = ( ( e > 0 ) ? c * m : c % n );
+		e = e - 1;
+		m = ( phase == 0 )
+			? 0
+			: ( ( d > 0 ) ? m * c : m % n );
+		
+		ready = (e == 0 & phase == 0) | (d == 0 & phase == 1);
+		c_out = c;
+		m_out = m;
+	}
+	
+}
+
