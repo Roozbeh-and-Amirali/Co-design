@@ -32,8 +32,7 @@ dp rsa(	in p_in, q_in	: ns(32);
 		in m_in			: ns(32);
 		in go			: ns( 1);
 		out ready		: ns( 1);
-		out c_out		: ns(32);
-		out m_out		: ns(32)) {
+		out result		: ns(32)) {
 	
 	reg n, e, z, d, c, m: ns(32); // c must be initialized 1. d must be initialized 2
 	sig done			: ns( 1);
@@ -53,9 +52,50 @@ dp rsa(	in p_in, q_in	: ns(32);
 			: ( ( d > 0 ) ? m * c : m % n );
 		
 		ready = (e == 0 & phase == 0) | (d == 0 & phase == 1);
-		c_out = c;
-		m_out = m;
+		result = (phase == 0) ? c : m;
 	}
 	
+}
+
+
+dp tb_rsa {
+
+	sig p, q	: ns(32);
+	sig m		: ns(32);
+	sig go		: ns( 1);
+	sig ready	: ns( 1);
+	sig result	: ns(32);
+	use rsa( p, q, m, go, ready, result );
+	
+	use my_arm;
+	
+	sig req, ack, data_out, data_in : ns(32);
+	use m_req(req);
+	use m_ack(ack);
+	use m_data_out(data_out);
+	use m_data_in(data_in);
+	
+	reg r_req		: ns( 1);
+	reg r_done		: ns( 1);
+	reg r_p, r_q	: ns(32);
+	reg r_m			: ns(32);
+	
+	always {
+		r_req = req;
+		r_done = ready;
+		data_in = result;
+		p = r_p;
+		q = r_q;
+		m = r_m;
+	}
+	
+	sfg ack0 { ack = 0; }
+	sfg ack1 { ack = 1; }
+	sfg getp { r_p = data_out; }
+	sfg getq { r_q = data_out; }
+	sfg getm { r_m = data_out; }
+	sfg start { go = 1; }
+	sfg wait { go = 0; }
+
 }
 
