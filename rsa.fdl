@@ -31,27 +31,42 @@ ipblock m_data_in(in data : ns(32)) {
 dp rsa(	in p_in, q_in	: ns(32);
 		in m_in			: ns(32);
 		in go			: ns( 1);
+		in go_next		: ns( 1);
+		in init			: ns( 1);
 		out ready		: ns( 1);
+		out d_ready		: ns( 1);
 		out result		: ns(32)) {
 	
 	reg n, e, z, d, c, m: ns(32); // c must be initialized 1. d must be initialized 2
 	sig done			: ns( 1);
 	reg phase			: ns( 1); // 0 for encyption, 1 for decryption
+	reg did_init		: ns( 1);
 	
 	always {
-		// n = p_in * q_in;
-		// z = (p_in - 1) * (q_in - 1);
-		// e = z - 1;	// e must be co-prime to z and smaller than z :)
-		d = ( phase == 0 )
-			? ( ( ( d * e ) % z == 1 ) ? d : d + 1 )
-			: ( d - 1 );			
-		c = ( ( e > 0 ) ? c * m : c % n );
-		e = e - 1;
+		phase = go_next ? 1 : phase;
+		did_init = init | did_init;
+		n = init ? (p_in * q_in) : n;
+		z = init ? ((p_in - 1) * (q_in - 1)) : z;
+		e = init ? ((p_in - 1) * (q_in - 1) - 1)
+				: ((did_init & e != 0) ? e - 1 : -1);
+		d = init
+				? 2
+				: ( did_init
+					? ( ( phase == 0 )
+						? ( ( ( d * e ) % z == 1 )
+							? d
+							: d + 1 )
+						: ( d - 1 ) )
+					: d );
+		c = init ? 1 : ( ( e > 0 ) ? c * m : c % n );
+		// e = ( e == 0 ) ? e : e - 1;
 		m = ( phase == 0 )
 			? 0
 			: ( ( d > 0 ) ? m * c : m % n );
 		
-		ready = (e == 0 & phase == 0) | (d == 0 & phase == 1);
+		ready = (e == -1 & phase == 0)
+				| (d == 0 & phase == 1);
+		d_ready = (did_init & ( (d*e) % z == 1 ) );
 		result = (phase == 0) ? c : m;
 	}
 	
@@ -65,7 +80,10 @@ dp tb_rsa {
 	sig go		: ns( 1);
 	sig ready	: ns( 1);
 	sig result	: ns(32);
-	use rsa( p, q, m, go, ready, result );
+	sig init_sig: ns( 1);
+	sig d_r_sig	: ns( 1);
+	sig go_next	: ns( 1);
+	use rsa( p, q, m, go, init_sig, go_next, ready, d_r_sig, result );
 	
 	use my_arm;
 	
@@ -79,6 +97,7 @@ dp tb_rsa {
 	reg r_done		: ns( 1);
 	reg r_p, r_q	: ns(32);
 	reg r_m			: ns(32);
+	reg r_d_r		: ns( 1);
 	
 	always {
 		r_req = req;
@@ -87,15 +106,58 @@ dp tb_rsa {
 		p = r_p;
 		q = r_q;
 		m = r_m;
+		d_r_sig = r_d_r;
 	}
 	
 	sfg ack0 { ack = 0; }
 	sfg ack1 { ack = 1; }
 	sfg getp { r_p = data_out; }
 	sfg getq { r_q = data_out; }
+	sfg init { init_sig = 1; }
 	sfg getm { r_m = data_out; }
 	sfg start { go = 1; }
 	sfg wait { go = 0; }
+	sfg nextphase { go_next = 1; }
 
 }
 
+
+fsm ctl_tb_rsa(tb_rsa) {
+	initial start;
+	state	get_p, get_q, init_stuff,
+			compute_d, get_m, compute_c,
+			out_c, compute_m, out_m;
+	
+	@start		(ack0, wait)	-> get_p;
+	
+	@get_p		if (r_req) then (getp, ack1, wait)	-> get_q;
+				else (ack0, wait)	-> get_p;
+	
+	@get_q		if (~r_req) then (getq, ack0, wait)	-> compute_n;
+				else (ack1, wait)	-> get_q;
+	
+	@init_stuff	(init)	-> compute_d;
+
+	@compute_d	if (r_d_r) then (ack0, wait) -> get_m;
+				else (ack0, wait)	-> compute_d;
+	
+	@get_m		if (r_req) then (getm, ack1, wait)	-> compute_c;
+				else (ack0, wait)	-> get_m;
+	
+	@compute_c	if (ready) then (ack0, wait)	-> out_c;
+				else (ack0, wait)	-> compute_c;
+	
+	@out_c		if (r_req) then (ack1, wait)	-> compute_m;
+				else (ack0, wait)	-> out_c;
+	
+	@compute_m	if (ready) then (ack0, wait)	-> out_m;
+				else (ack0, wait)	-> compute_m;
+	
+	@out_m		if (~r_req) then (ack0, wait)	->	start;
+				else (ack1, wait)	-> out_m;
+}
+
+
+system S {
+	tb_rsa;
+}
