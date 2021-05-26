@@ -58,11 +58,17 @@ dp rsa(	in p_in, q_in	: ns(32);
 							: d + 1 )
 						: ( d - 1 ) )
 					: d );
-		c = init ? 1 : ( ( e > 0 ) ? c * m : c % n );
+		c = init
+				? 1
+				: did_init
+					? ( ( e > 0 ) ? c * m : c % n )
+					: c;
 		// e = ( e == 0 ) ? e : e - 1;
 		m = ( phase == 0 )
 			? 0
-			: ( ( d > 0 ) ? m * c : m % n );
+			: did_init
+				? ( ( d > 0 ) ? m * c : m % n ) 
+				: m;
 		
 		ready = (e == -1 & phase == 0)
 				| (d == 0 & phase == 1);
@@ -106,7 +112,7 @@ dp tb_rsa {
 		p = r_p;
 		q = r_q;
 		m = r_m;
-		d_r_sig = r_d_r;
+		r_d_r = d_r_sig;
 	}
 	
 	sfg ack0 { ack = 0; }
@@ -133,7 +139,7 @@ fsm ctl_tb_rsa(tb_rsa) {
 	@get_p		if (r_req) then (getp, ack1, wait)	-> get_q;
 				else (ack0, wait)	-> get_p;
 	
-	@get_q		if (~r_req) then (getq, ack0, wait)	-> compute_n;
+	@get_q		if (~r_req) then (getq, ack0, wait)	-> init_stuff;
 				else (ack1, wait)	-> get_q;
 	
 	@init_stuff	(init)	-> compute_d;
@@ -147,7 +153,7 @@ fsm ctl_tb_rsa(tb_rsa) {
 	@compute_c	if (ready) then (ack0, wait)	-> out_c;
 				else (ack0, wait)	-> compute_c;
 	
-	@out_c		if (~r_req) then (ack0, wait)	-> compute_m;
+	@out_c		if (~r_req) then (nextphase, ack0, wait)	-> compute_m;
 				else (ack0, wait)	-> out_c;
 	
 	@compute_m	if (ready) then (ack0, wait)	-> out_m;
