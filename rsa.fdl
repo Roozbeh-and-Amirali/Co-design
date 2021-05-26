@@ -147,13 +147,13 @@ fsm ctl_tb_rsa(tb_rsa) {
 	@compute_c	if (ready) then (ack0, wait)	-> out_c;
 				else (ack0, wait)	-> compute_c;
 	
-	@out_c		if (r_req) then (ack1, wait)	-> compute_m;
+	@out_c		if (~r_req) then (ack0, wait)	-> compute_m;
 				else (ack0, wait)	-> out_c;
 	
 	@compute_m	if (ready) then (ack0, wait)	-> out_m;
 				else (ack0, wait)	-> compute_m;
 	
-	@out_m		if (~r_req) then (ack0, wait)	->	start;
+	@out_m		if (r_req) then (ack1, wait)	->	start;
 				else (ack1, wait)	-> out_m;
 }
 
