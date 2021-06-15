@@ -56,33 +56,39 @@ dp blur {
 	
 	always {
 		data_in_ready = upins == INS_START ? 1 : 0;
+		ramidata = 0;
 	}
 	
 	sfg init {
+		upstatus = 0;
 		ramcnt = 0;
-	}
-	
-	sfg calculate_next {
-		// temp_left = ( ramcnt <= 0 ) ? 0 : 
-		// temp_sum = (temp_left + temp_up + temp_right + temp_down) >> 2;
+		ramadr = 0;
+		wr = 0;
 	}
 	
 	sfg calculate_left_0 {
 		ramadr = (ramcnt <= 0) ? ramcnt : ramcnt - 1;
 		wr = 0;
-		$display( "cycle 1 is ", $dec, $cycle );
+		upstatus = 0;
 	}
 	
 	sfg calculate_left_1 {
-		temp_left = ramodata;
-		$display( "cycle 2 is ", $dec, $cycle );
+		temp_left = ramcnt <= 0 ? 0 : ramodata;
+		upstatus = 0;
+		ramadr = 0;
+		wr = 0;
 	}
 	
 	sfg announce_ready {
 		upstatus = 1;
+		ramadr = 0;
+		wr = 0;
 	}
 	
 	sfg idle {
+		upstatus = 0;
+		ramadr = 0;
+		wr = 0;
 	}
 
 }
@@ -90,7 +96,7 @@ dp blur {
 fsm blur_ctl(blur) {
 
 	initial s0;
-	state s1, s2, s3, s4;
+	state s1, s2, s3, s4, s5;
 	
 	@s0 (init) -> s1;
 	
@@ -100,9 +106,11 @@ fsm blur_ctl(blur) {
 	@s2	if (ramcnt == 100) then (announce_ready) -> s0;
 		else (idle) -> s3;	
 
-	@s3 (calculate_left_0, calculate_left_1) -> s4;
+	@s3 (calculate_left_0) -> s4;
 	
-	@s4 (idle) -> s4;
+	@s4 (calculate_left_1) -> s5;
+	
+	@s5 (idle) -> s5;
 
 }
 

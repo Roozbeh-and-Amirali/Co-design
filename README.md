@@ -7,5 +7,5 @@ This repository contains code to get a picture from software and blur it on a 80
 ```bash
 sdcc blur.c
 cpp -P blur.fdl >temp.fdl
-/opt/gezel/bin/gplatform temp.fdl 
+gplatform temp.fdl 
 ```
