@@ -1,0 +1,114 @@
+
+#define INS_IDLE 0
+#define INS_START 1
+
+ipblock my8051 {
+	iptype "i8051system";
+	ipparm "exec=blur.ihx";
+	ipparm "verbose=1";
+	ipparm "period=1";
+}
+
+ipblock my8051_data(out data : ns(8)) {
+	iptype "i8051systemsource";
+	ipparm "core=my8051";
+	ipparm "port=P0";
+}
+
+ipblock my8051_ins(out data : ns(8)) {
+	iptype "i8051systemsource";
+	ipparm "core=my8051";
+	ipparm "port=P1";
+}
+
+ipblock my8051_status(in data : ns(8)) {
+	iptype "i8051systemsink";
+	ipparm "core=my8051";
+	ipparm "port=P2";
+}
+
+ipblock my8051_xram(in    idata    : ns(8);
+                    out   odata    : ns(8);
+                    in    address  : ns(8);
+                    in    wr       : ns(8)) {
+	iptype "i8051buffer";
+	ipparm "core=my8051";
+	ipparm "xbus=0x4000";
+	ipparm "xrange=0x64"; // 100 locations at address 0x4000
+}
+
+
+dp blur {
+	sig updata, upins, upstatus : ns(8);
+	use my8051_data (updata);
+	use my8051_ins (upins);
+	use my8051_status (upstatus);
+	
+	sig ramadr, ramidata, ramodata : ns(8);
+	sig wr : ns(1);
+	use my8051_xram(ramidata, ramodata, ramadr, wr);
+	
+	reg ramcnt : ns(8);
+	reg data_in_ready : ns(1);
+	
+	sig temp_left, temp_up, temp_right, temp_down : ns(9);
+	sig temp_sum : ns(9);
+	
+	always {
+		data_in_ready = upins == INS_START ? 1 : 0;
+	}
+	
+	sfg init {
+		ramcnt = 0;
+	}
+	
+	sfg calculate_next {
+		// temp_left = ( ramcnt <= 0 ) ? 0 : 
+		// temp_sum = (temp_left + temp_up + temp_right + temp_down) >> 2;
+	}
+	
+	sfg calculate_left_0 {
+		ramadr = (ramcnt <= 0) ? ramcnt : ramcnt - 1;
+		wr = 0;
+		$display( "cycle 1 is ", $dec, $cycle );
+	}
+	
+	sfg calculate_left_1 {
+		temp_left = ramodata;
+		$display( "cycle 2 is ", $dec, $cycle );
+	}
+	
+	sfg announce_ready {
+		upstatus = 1;
+	}
+	
+	sfg idle {
+	}
+
+}
+
+fsm blur_ctl(blur) {
+
+	initial s0;
+	state s1, s2, s3, s4;
+	
+	@s0 (init) -> s1;
+	
+	@s1	if (data_in_ready) then (idle) -> s2;
+		else (idle) -> s1;
+	
+	@s2	if (ramcnt == 100) then (announce_ready) -> s0;
+		else (idle) -> s3;	
+
+	@s3 (calculate_left_0, calculate_left_1) -> s4;
+	
+	@s4 (idle) -> s4;
+
+}
+
+
+system S {
+	my8051;
+	blur;
+}
+
