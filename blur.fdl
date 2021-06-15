@@ -9,22 +9,16 @@ ipblock my8051 {
 	ipparm "period=1";
 }
 
-ipblock my8051_data(out data : ns(8)) {
+ipblock my8051_ins(out data : ns(8)) {
 	iptype "i8051systemsource";
 	ipparm "core=my8051";
 	ipparm "port=P0";
 }
 
-ipblock my8051_ins(out data : ns(8)) {
-	iptype "i8051systemsource";
-	ipparm "core=my8051";
-	ipparm "port=P1";
-}
-
 ipblock my8051_status(in data : ns(8)) {
 	iptype "i8051systemsink";
 	ipparm "core=my8051";
-	ipparm "port=P2";
+	ipparm "port=P1";
 }
 
 ipblock my8051_xram(in    idata    : ns(8);
@@ -39,8 +33,7 @@ ipblock my8051_xram(in    idata    : ns(8);
 
 
 dp blur {
-	sig updata, upins, upstatus : ns(8);
-	use my8051_data (updata);
+	sig upins, upstatus : ns(8);
 	use my8051_ins (upins);
 	use my8051_status (upstatus);
 	
@@ -51,7 +44,7 @@ dp blur {
 	reg ramcnt : ns(8);
 	reg data_in_ready : ns(1);
 	
-	sig temp_left, temp_up, temp_right, temp_down : ns(9);
+	reg temp_left, temp_up, temp_right, temp_down : ns(9);
 	sig temp_sum : ns(9);
 	
 	always {
@@ -67,13 +60,68 @@ dp blur {
 	}
 	
 	sfg calculate_left_0 {
-		ramadr = (ramcnt <= 0) ? ramcnt : ramcnt - 1;
+		ramadr = ramcnt % 10 == 0 ? ramcnt : ramcnt - 1;
 		wr = 0;
 		upstatus = 0;
 	}
 	
 	sfg calculate_left_1 {
-		temp_left = ramcnt <= 0 ? 0 : ramodata;
+		temp_left = ramcnt % 10 == 0 ? 0 : ramodata;
+		upstatus = 0;
+		ramadr = 0;
+		wr = 0;
+	}
+	
+	sfg calculate_top_0 {
+		ramadr = ramcnt < 10 ? ramcnt : ramcnt - 10;
+		wr = 0;
+		upstatus = 0;
+	}
+	
+	sfg calculate_top_1 {
+		temp_up = ramcnt < 10 ? 0 : ramodata;
+		upstatus = 0;
+		ramadr = 0;
+		wr = 0;
+	}
+	
+	sfg calculate_right_0 {
+		ramadr = ramcnt % 10 == 9 ? ramcnt : ramcnt + 1;
+		wr = 0;
+		upstatus = 0;
+	}
+	
+	sfg calculate_right_1 {
+		temp_right = ramcnt % 10 == 9 ? 0 : ramodata;
+		upstatus = 0;
+		ramadr = 0;
+		wr = 0;
+	}
+	
+	sfg calculate_down_0 {
+		ramadr = ramcnt >= 90 ? ramcnt : ramcnt + 10;
+		wr = 0;
+		upstatus = 0;
+	}
+	
+	sfg calculate_down_1 {
+		temp_down = ramcnt >= 90 ? 0 : ramodata;
+		upstatus = 0;
+		ramadr = 0;
+		wr = 0;
+	}
+	
+	sfg calculate_and_display_mean {
+		// $display( "left: ", $dec, temp_left, " up: ", temp_up, " right: ", temp_right, " down: ", temp_down );
+		temp_sum = (temp_left + temp_up + temp_right + temp_down) >> 2;
+		$display( "pixel ", $dec, ramcnt, ": ", $dec, temp_sum );
+		upstatus = 0;
+		ramadr = 0;
+		wr = 0;
+	}
+	
+	sfg inc_ramcnt {
+		ramcnt = ramcnt + 1;
 		upstatus = 0;
 		ramadr = 0;
 		wr = 0;
@@ -96,7 +144,7 @@ dp blur {
 fsm blur_ctl(blur) {
 
 	initial s0;
-	state s1, s2, s3, s4, s5;
+	state s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12;
 	
 	@s0 (init) -> s1;
 	
@@ -104,13 +152,27 @@ fsm blur_ctl(blur) {
 		else (idle) -> s1;
 	
 	@s2	if (ramcnt == 100) then (announce_ready) -> s0;
-		else (idle) -> s3;	
+		else (idle) -> s3;
 
 	@s3 (calculate_left_0) -> s4;
 	
 	@s4 (calculate_left_1) -> s5;
 	
-	@s5 (idle) -> s5;
+	@s5 (calculate_top_0) -> s6;
+	
+	@s6 (calculate_top_1) -> s7;
+	
+	@s7 (calculate_right_0) -> s8;
+	
+	@s8 (calculate_right_1) -> s9;
+	
+	@s9 (calculate_down_0) -> s10;
+	
+	@s10 (calculate_down_1) -> s11;
+	
+	@s11 (calculate_and_display_mean) -> s12;
+	
+	@s12 (inc_ramcnt) -> s2;
 
 }
 

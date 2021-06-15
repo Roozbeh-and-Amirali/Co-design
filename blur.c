@@ -18,11 +18,11 @@ void main () {
 	unsigned i, j;
 	for ( i = 0; i < 100; i++ ) 
 		for ( j = 0; j < 100; j++ ) 
-			shared[i*10+j] = 5;
+			shared[i*10+j] = 50;
 	
-	P1 = INS_START;
+	P0 = INS_START;
 	
-	while ( P2 );
+	while ( P1 );
 	
 	terminate();
 
