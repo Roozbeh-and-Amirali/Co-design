@@ -33,7 +33,8 @@ ipblock my8051_xram(in    idata    : ns(8);
 
 
 dp blur {
-	sig upins, upstatus : ns(8);
+	sig upins : ns(8);
+	reg upstatus : ns(8);
 	use my8051_ins (upins);
 	use my8051_status (upstatus);
 	
@@ -53,7 +54,7 @@ dp blur {
 	}
 	
 	sfg init {
-		upstatus = 0;
+		// upstatus = 0;
 		ramcnt = 0;
 		ramadr = 0;
 		wr = 0;
@@ -62,12 +63,12 @@ dp blur {
 	sfg calculate_left_0 {
 		ramadr = ramcnt % 10 == 0 ? ramcnt : ramcnt - 1;
 		wr = 0;
-		upstatus = 0;
+		// upstatus = 0;
 	}
 	
 	sfg calculate_left_1 {
 		temp_left = ramcnt % 10 == 0 ? 0 : ramodata;
-		upstatus = 0;
+		// upstatus = 0;
 		ramadr = 0;
 		wr = 0;
 	}
@@ -75,12 +76,12 @@ dp blur {
 	sfg calculate_top_0 {
 		ramadr = ramcnt < 10 ? ramcnt : ramcnt - 10;
 		wr = 0;
-		upstatus = 0;
+		// upstatus = 0;
 	}
 	
 	sfg calculate_top_1 {
 		temp_up = ramcnt < 10 ? 0 : ramodata;
-		upstatus = 0;
+		// upstatus = 0;
 		ramadr = 0;
 		wr = 0;
 	}
@@ -88,12 +89,12 @@ dp blur {
 	sfg calculate_right_0 {
 		ramadr = ramcnt % 10 == 9 ? ramcnt : ramcnt + 1;
 		wr = 0;
-		upstatus = 0;
+		// upstatus = 0;
 	}
 	
 	sfg calculate_right_1 {
 		temp_right = ramcnt % 10 == 9 ? 0 : ramodata;
-		upstatus = 0;
+		// upstatus = 0;
 		ramadr = 0;
 		wr = 0;
 	}
@@ -101,12 +102,12 @@ dp blur {
 	sfg calculate_down_0 {
 		ramadr = ramcnt >= 90 ? ramcnt : ramcnt + 10;
 		wr = 0;
-		upstatus = 0;
+		// upstatus = 0;
 	}
 	
 	sfg calculate_down_1 {
 		temp_down = ramcnt >= 90 ? 0 : ramodata;
-		upstatus = 0;
+		// upstatus = 0;
 		ramadr = 0;
 		wr = 0;
 	}
@@ -114,15 +115,15 @@ dp blur {
 	sfg calculate_and_display_mean {
 		// $display( "left: ", $dec, temp_left, " up: ", temp_up, " right: ", temp_right, " down: ", temp_down );
 		temp_sum = (temp_left + temp_up + temp_right + temp_down) >> 2;
-		$display( "pixel ", $dec, ramcnt, ": ", $dec, temp_sum );
-		upstatus = 0;
+		$display( upstatus, "pixel ", $dec, ramcnt, ": ", $dec, temp_sum );
+		// upstatus = 0;
 		ramadr = 0;
 		wr = 0;
 	}
 	
 	sfg inc_ramcnt {
 		ramcnt = ramcnt + 1;
-		upstatus = 0;
+		// upstatus = 0;
 		ramadr = 0;
 		wr = 0;
 	}
@@ -134,7 +135,7 @@ dp blur {
 	}
 	
 	sfg idle {
-		upstatus = 0;
+		// upstatus = 0;
 		ramadr = 0;
 		wr = 0;
 	}
