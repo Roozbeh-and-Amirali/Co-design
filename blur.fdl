@@ -147,28 +147,28 @@ fsm blur_ctl(blur) {
 	state	wait_for_in, algo_loop, get_left, get_top,
 			get_right, get_down, output, next_pixel, disp_img;
 	
-	@s0 (init) -> wait_for_in;
+	@s0 			(init) -> wait_for_in;
 	
 	@wait_for_in	if (data_in_ready) then (announce_disp) -> disp_img;
-		else (idle) -> wait_for_in;
+					else (idle) -> wait_for_in;
 	
-	@disp_img	if (ramcnt == 100) then (reset_ramcnt, announce_blur) -> algo_loop;
-				else (display_pixel) -> disp_img;
+	@disp_img		if (ramcnt == 100) then (reset_ramcnt, announce_blur) -> algo_loop;
+					else (display_pixel) -> disp_img;
 	
-	@algo_loop	if (ramcnt == 100) then (announce_ready) -> s0;
-		else (idle) -> get_left;
+	@algo_loop		if (ramcnt == 100) then (announce_ready) -> s0;
+					else (idle) -> get_left;
 
-	@get_left (calculate_left) -> get_top;
+	@get_left		(calculate_left) -> get_top;
 	
-	@get_top (calculate_top) -> get_right;
+	@get_top		(calculate_top) -> get_right;
 	
-	@get_right (calculate_right) -> get_down;
+	@get_right		(calculate_right) -> get_down;
 	
-	@get_down (calculate_down) -> output;
+	@get_down		(calculate_down) -> output;
 	
-	@output (calculate_and_display_mean) -> next_pixel;
+	@output			(calculate_and_display_mean) -> next_pixel;
 	
-	@next_pixel (inc_ramcnt) -> algo_loop;
+	@next_pixel		(inc_ramcnt) -> algo_loop;
 
 }
 
