@@ -43,7 +43,11 @@ dp blur {
 	use my8051_xram(ramidata, ramodata, ramadr, wr);
 	
 	reg ramcnt : ns(8);
+	sig ramcnt_temp : ns(8);
 	reg data_in_ready : ns(1);
+	
+	reg image_counter : ns(4);
+	sig image_counter_temp : ns(4);
 	
 	reg temp_left, temp_up, temp_right, temp_down : ns(11);
 	sig temp_sum : ns(11);
@@ -57,6 +61,7 @@ dp blur {
 		ramcnt = 0;
 		ramadr = 0;
 		wr = 0;
+		image_counter = image_counter + 1;
 	}
 	
 	sfg calculate_left {
@@ -85,7 +90,8 @@ dp blur {
 	
 	sfg calculate_and_display_mean {
 		temp_sum = (temp_left + temp_up + temp_right + temp_down) >> 2;
-		$display( "pixel ", $dec, ramcnt, ": ", $dec, temp_sum );
+		ramcnt_temp = ramcnt + 1;
+		$display( "pixel ", $dec, ramcnt_temp, ": ", $dec, temp_sum );
 		ramadr = 0;
 		wr = 0;
 	}
@@ -96,8 +102,34 @@ dp blur {
 		wr = 0;
 	}
 	
+	sfg announce_disp {
+		image_counter_temp = image_counter;
+		$display( "------------------ Image ", $dec, image_counter_temp, " ----------------------" );
+		$display( "          Original image: " );
+		ramadr = 0;
+		wr = 0;
+	}
+	
+	sfg announce_blur { 
+		$display( "          Blurred image: " );
+	}
+	
+	sfg display_pixel {
+		ramadr = ramcnt;
+		ramcnt_temp = ramcnt + 1;
+		wr = 0;
+		$display( "pixel ", $dec, ramcnt_temp, ": ", ramodata );
+		ramcnt = ramcnt + 1;
+	}
+	
 	sfg announce_ready {
 		upstatus = 1;
+		ramadr = 0;
+		wr = 0;
+	}
+	
+	sfg reset_ramcnt {
+		ramcnt = 0;
 		ramadr = 0;
 		wr = 0;
 	}
@@ -112,27 +144,31 @@ dp blur {
 fsm blur_ctl(blur) {
 
 	initial s0;
-	state s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12;
+	state	wait_for_in, algo_loop, get_left, get_top,
+			get_right, get_down, output, next_pixel, disp_img;
 	
-	@s0 (init) -> s1;
+	@s0 (init) -> wait_for_in;
 	
-	@s1	if (data_in_ready) then (idle) -> s2;
-		else (idle) -> s1;
+	@wait_for_in	if (data_in_ready) then (announce_disp) -> disp_img;
+		else (idle) -> wait_for_in;
 	
-	@s2	if (ramcnt == 100) then (announce_ready) -> s0;
-		else (idle) -> s3;
+	@disp_img	if (ramcnt == 100) then (reset_ramcnt, announce_blur) -> algo_loop;
+				else (display_pixel) -> disp_img;
+	
+	@algo_loop	if (ramcnt == 100) then (announce_ready) -> s0;
+		else (idle) -> get_left;
 
-	@s3 (calculate_left) -> s4;
+	@get_left (calculate_left) -> get_top;
 	
-	@s4 (calculate_top) -> s5;
+	@get_top (calculate_top) -> get_right;
 	
-	@s5 (calculate_right) -> s6;
+	@get_right (calculate_right) -> get_down;
 	
-	@s6 (calculate_down) -> s7;
+	@get_down (calculate_down) -> output;
 	
-	@s7 (calculate_and_display_mean) -> s8;
+	@output (calculate_and_display_mean) -> next_pixel;
 	
-	@s8 (inc_ramcnt) -> s2;
+	@next_pixel (inc_ramcnt) -> algo_loop;
 
 }
 
