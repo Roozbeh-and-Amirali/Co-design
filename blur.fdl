@@ -45,8 +45,8 @@ dp blur {
 	reg ramcnt : ns(8);
 	reg data_in_ready : ns(1);
 	
-	reg temp_left, temp_up, temp_right, temp_down : ns(9);
-	sig temp_sum : ns(9);
+	reg temp_left, temp_up, temp_right, temp_down : ns(11);
+	sig temp_sum : ns(11);
 	
 	always {
 		data_in_ready = upins == INS_START ? 1 : 0;
@@ -54,76 +54,44 @@ dp blur {
 	}
 	
 	sfg init {
-		// upstatus = 0;
 		ramcnt = 0;
 		ramadr = 0;
 		wr = 0;
 	}
 	
-	sfg calculate_left_0 {
+	sfg calculate_left {
 		ramadr = ramcnt % 10 == 0 ? ramcnt : ramcnt - 1;
-		wr = 0;
-		// upstatus = 0;
-	}
-	
-	sfg calculate_left_1 {
 		temp_left = ramcnt % 10 == 0 ? 0 : ramodata;
-		// upstatus = 0;
-		ramadr = 0;
 		wr = 0;
 	}
-	
-	sfg calculate_top_0 {
+		
+	sfg calculate_top {
 		ramadr = ramcnt < 10 ? ramcnt : ramcnt - 10;
-		wr = 0;
-		// upstatus = 0;
-	}
-	
-	sfg calculate_top_1 {
 		temp_up = ramcnt < 10 ? 0 : ramodata;
-		// upstatus = 0;
-		ramadr = 0;
 		wr = 0;
 	}
 	
-	sfg calculate_right_0 {
+	sfg calculate_right {
 		ramadr = ramcnt % 10 == 9 ? ramcnt : ramcnt + 1;
-		wr = 0;
-		// upstatus = 0;
-	}
-	
-	sfg calculate_right_1 {
 		temp_right = ramcnt % 10 == 9 ? 0 : ramodata;
-		// upstatus = 0;
-		ramadr = 0;
 		wr = 0;
 	}
-	
-	sfg calculate_down_0 {
+		
+	sfg calculate_down {
 		ramadr = ramcnt >= 90 ? ramcnt : ramcnt + 10;
-		wr = 0;
-		// upstatus = 0;
-	}
-	
-	sfg calculate_down_1 {
 		temp_down = ramcnt >= 90 ? 0 : ramodata;
-		// upstatus = 0;
-		ramadr = 0;
 		wr = 0;
 	}
 	
 	sfg calculate_and_display_mean {
-		// $display( "left: ", $dec, temp_left, " up: ", temp_up, " right: ", temp_right, " down: ", temp_down );
 		temp_sum = (temp_left + temp_up + temp_right + temp_down) >> 2;
-		$display( upstatus, "pixel ", $dec, ramcnt, ": ", $dec, temp_sum );
-		// upstatus = 0;
+		$display( "pixel ", $dec, ramcnt, ": ", $dec, temp_sum );
 		ramadr = 0;
 		wr = 0;
 	}
 	
 	sfg inc_ramcnt {
 		ramcnt = ramcnt + 1;
-		// upstatus = 0;
 		ramadr = 0;
 		wr = 0;
 	}
@@ -135,7 +103,6 @@ dp blur {
 	}
 	
 	sfg idle {
-		// upstatus = 0;
 		ramadr = 0;
 		wr = 0;
 	}
@@ -155,25 +122,17 @@ fsm blur_ctl(blur) {
 	@s2	if (ramcnt == 100) then (announce_ready) -> s0;
 		else (idle) -> s3;
 
-	@s3 (calculate_left_0) -> s4;
+	@s3 (calculate_left) -> s4;
 	
-	@s4 (calculate_left_1) -> s5;
+	@s4 (calculate_top) -> s5;
 	
-	@s5 (calculate_top_0) -> s6;
+	@s5 (calculate_right) -> s6;
 	
-	@s6 (calculate_top_1) -> s7;
+	@s6 (calculate_down) -> s7;
 	
-	@s7 (calculate_right_0) -> s8;
+	@s7 (calculate_and_display_mean) -> s8;
 	
-	@s8 (calculate_right_1) -> s9;
-	
-	@s9 (calculate_down_0) -> s10;
-	
-	@s10 (calculate_down_1) -> s11;
-	
-	@s11 (calculate_and_display_mean) -> s12;
-	
-	@s12 (inc_ramcnt) -> s2;
+	@s8 (inc_ramcnt) -> s2;
 
 }
 
